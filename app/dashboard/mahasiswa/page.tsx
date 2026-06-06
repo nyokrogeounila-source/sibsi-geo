@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
+import Link from 'next/link'
 
 export default async function DashboardMahasiswa() {
   const supabase = await createClient()
@@ -18,9 +19,30 @@ export default async function DashboardMahasiswa() {
 
   const { data: mahasiswa } = await supabase
     .from('mahasiswa')
-    .select('*, pb1:pb1_id(id, profiles(nama)), pb2:pb2_id(id, profiles(nama)), penguji:penguji_id(id, profiles(nama))')
+    .select('id, npm, angkatan, pb1_id, pb2_id, penguji_id')
     .eq('id', user.id)
     .single()
+
+  let pb1Nama = '—'
+  let pb2Nama = '—'
+
+  if (mahasiswa?.pb1_id) {
+    const { data: pb1 } = await supabase
+      .from('profiles')
+      .select('nama')
+      .eq('id', mahasiswa.pb1_id)
+      .single()
+    pb1Nama = pb1?.nama ?? '—'
+  }
+
+  if (mahasiswa?.pb2_id) {
+    const { data: pb2 } = await supabase
+      .from('profiles')
+      .select('nama')
+      .eq('id', mahasiswa.pb2_id)
+      .single()
+    pb2Nama = pb2?.nama ?? '—'
+  }
 
   const { data: bimbingan } = await supabase
     .from('bimbingan')
@@ -35,12 +57,19 @@ export default async function DashboardMahasiswa() {
     .eq('mahasiswa_id', user.id)
     .single()
 
+  const jenisBimbinganLabel: Record<string, string> = {
+    proposal: 'Bimbingan Proposal',
+    pra_penelitian: 'Bimbingan Pra Penelitian',
+    hasil_penelitian: 'Bimbingan Hasil Penelitian',
+    pasca_seminar_hasil: 'Bimbingan Pasca Seminar Hasil',
+    cetak: 'Bimbingan Cetak',
+  }
+
   return (
     <div className="flex min-h-screen">
       <Sidebar role="mahasiswa" nama={profile.nama} foto_url={profile.foto_url} />
 
       <main className="flex-1 p-8">
-        {/* Greeting */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-[#0C4A6E] mb-1">
             Selamat datang, {profile.nama.split(' ')[0]}!
@@ -50,7 +79,6 @@ export default async function DashboardMahasiswa() {
           </p>
         </div>
 
-        {/* Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-xl border border-[#DAEAF7] p-5">
             <p className="text-xs text-[#64748B] mb-1">Status Judul</p>
@@ -72,22 +100,17 @@ export default async function DashboardMahasiswa() {
 
           <div className="bg-white rounded-xl border border-[#DAEAF7] p-5">
             <p className="text-xs text-[#64748B] mb-1">Pembimbing 1</p>
-            <p className="text-lg font-semibold text-[#0C4A6E]">
-              {mahasiswa?.pb1?.profiles?.nama ?? '—'}
-            </p>
+            <p className="text-lg font-semibold text-[#0C4A6E]">{pb1Nama}</p>
             <p className="text-xs text-[#94A3B8] mt-1">Pembimbing Utama</p>
           </div>
 
           <div className="bg-white rounded-xl border border-[#DAEAF7] p-5">
             <p className="text-xs text-[#64748B] mb-1">Pembimbing 2</p>
-            <p className="text-lg font-semibold text-[#0C4A6E]">
-              {mahasiswa?.pb2?.profiles?.nama ?? '—'}
-            </p>
+            <p className="text-lg font-semibold text-[#0C4A6E]">{pb2Nama}</p>
             <p className="text-xs text-[#94A3B8] mt-1">Pembimbing Pendamping</p>
           </div>
         </div>
 
-        {/* Bimbingan Terakhir */}
         <div className="bg-white rounded-xl border border-[#DAEAF7] p-6">
           <h2 className="font-semibold text-[#0C4A6E] mb-4">Bimbingan Terakhir</h2>
           {bimbingan && bimbingan.length > 0 ? (
@@ -100,7 +123,7 @@ export default async function DashboardMahasiswa() {
                   <div>
                     <p className="text-sm font-medium text-[#334155]">{item.topik}</p>
                     <p className="text-xs text-[#94A3B8] mt-0.5">
-                      {item.jenis_bimbingan.replace(/_/g, ' ')} — {item.tanggal_bimbingan}
+                      {jenisBimbinganLabel[item.jenis_bimbingan]} — {item.tanggal_bimbingan}
                     </p>
                   </div>
                   <span className={`text-xs px-2.5 py-1 rounded-full ${
@@ -116,12 +139,12 @@ export default async function DashboardMahasiswa() {
           ) : (
             <div className="text-center py-8">
               <p className="text-sm text-[#94A3B8]">Belum ada pengajuan bimbingan</p>
-              
+              <Link
                 href="/dashboard/mahasiswa/bimbingan"
                 className="text-xs text-[#0891B2] hover:underline mt-2 inline-block"
               >
                 Ajukan bimbingan pertama →
-              </a>
+              </Link>
             </div>
           )}
         </div>

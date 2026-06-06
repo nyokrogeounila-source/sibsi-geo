@@ -43,6 +43,9 @@ export default function PengajuanBimbingan() {
 
   const [profile, setProfile] = useState<any>(null)
   const [mahasiswa, setMahasiswa] = useState<any>(null)
+  const [pb1Nama, setPb1Nama] = useState('—')
+  const [pb2Nama, setPb2Nama] = useState('—')
+  const [pengujiNama, setPengujiNama] = useState('—')
   const [bimbinganList, setBimbinganList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -60,9 +63,7 @@ export default function PengajuanBimbingan() {
   const [catatanTambahan, setCatatanTambahan] = useState('')
   const [tanggal, setTanggal] = useState('')
 
-  useEffect(() => {
-    load()
-  }, [])
+  useEffect(() => { load() }, [])
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -76,9 +77,36 @@ export default function PengajuanBimbingan() {
 
     const { data: m } = await supabase
       .from('mahasiswa')
-      .select('*, pb1:pb1_id(id, profiles(nama)), pb2:pb2_id(id, profiles(nama)), penguji:penguji_id(id, profiles(nama))')
+      .select('id, npm, angkatan, pb1_id, pb2_id, penguji_id')
       .eq('id', user.id)
       .single()
+
+    if (m?.pb1_id) {
+      const { data: pb1 } = await supabase
+        .from('profiles')
+        .select('nama')
+        .eq('id', m.pb1_id)
+        .single()
+      setPb1Nama(pb1?.nama ?? '—')
+    }
+
+    if (m?.pb2_id) {
+      const { data: pb2 } = await supabase
+        .from('profiles')
+        .select('nama')
+        .eq('id', m.pb2_id)
+        .single()
+      setPb2Nama(pb2?.nama ?? '—')
+    }
+
+    if (m?.penguji_id) {
+      const { data: penguji } = await supabase
+        .from('profiles')
+        .select('nama')
+        .eq('id', m.penguji_id)
+        .single()
+      setPengujiNama(penguji?.nama ?? '—')
+    }
 
     const { data: bl } = await supabase
       .from('bimbingan')
@@ -198,11 +226,8 @@ export default function PengajuanBimbingan() {
             </button>
           )}
         </div>
-        <p className="text-sm text-[#64748B] mb-8">
-          Kelola pengajuan bimbingan skripsi Anda
-        </p>
+        <p className="text-sm text-[#64748B] mb-8">Kelola pengajuan bimbingan skripsi Anda</p>
 
-        {/* Form */}
         {showForm && (
           <div className="bg-white rounded-xl border border-[#DAEAF7] p-6 mb-8">
             <div className="flex items-center justify-between mb-5">
@@ -236,10 +261,7 @@ export default function PengajuanBimbingan() {
                   </label>
                   <select
                     value={jenis}
-                    onChange={(e) => {
-                      setJenis(e.target.value)
-                      setDitujukan('pb1')
-                    }}
+                    onChange={(e) => { setJenis(e.target.value); setDitujukan('pb1') }}
                     className="w-full px-4 py-2.5 rounded-lg border border-[#DAEAF7] text-sm text-[#334155] focus:outline-none focus:border-[#0891B2] focus:ring-1 focus:ring-[#0891B2] transition bg-white"
                   >
                     {jenisBimbinganOptions.map((opt) => (
@@ -263,20 +285,16 @@ export default function PengajuanBimbingan() {
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                       ))}
                   </select>
-                  {ditujukan && mahasiswa && (
-                    <p className="text-xs text-[#94A3B8] mt-1">
-                      {ditujukan === 'pb1' && mahasiswa?.pb1?.profiles?.nama}
-                      {ditujukan === 'pb2' && mahasiswa?.pb2?.profiles?.nama}
-                      {ditujukan === 'penguji' && mahasiswa?.penguji?.profiles?.nama}
-                    </p>
-                  )}
+                  <p className="text-xs text-[#94A3B8] mt-1">
+                    {ditujukan === 'pb1' && pb1Nama}
+                    {ditujukan === 'pb2' && pb2Nama}
+                    {ditujukan === 'penguji' && pengujiNama}
+                  </p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#334155] mb-1.5">
-                  Topik Bimbingan
-                </label>
+                <label className="block text-sm font-medium text-[#334155] mb-1.5">Topik Bimbingan</label>
                 <input
                   type="text"
                   value={topik}
@@ -288,9 +306,7 @@ export default function PengajuanBimbingan() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#334155] mb-1.5">
-                  Deskripsi / Catatan
-                </label>
+                <label className="block text-sm font-medium text-[#334155] mb-1.5">Deskripsi / Catatan</label>
                 <textarea
                   value={deskripsi}
                   onChange={(e) => setDeskripsi(e.target.value)}
@@ -341,9 +357,7 @@ export default function PengajuanBimbingan() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#334155] mb-1.5">
-                  Tanggal Bimbingan
-                </label>
+                <label className="block text-sm font-medium text-[#334155] mb-1.5">Tanggal Bimbingan</label>
                 <input
                   type="date"
                   value={tanggal}
@@ -373,7 +387,6 @@ export default function PengajuanBimbingan() {
           </div>
         )}
 
-        {/* Daftar Bimbingan */}
         <div className="space-y-4">
           {bimbinganList.length === 0 ? (
             <div className="bg-white rounded-xl border border-[#DAEAF7] p-10 text-center">
@@ -384,13 +397,13 @@ export default function PengajuanBimbingan() {
               const keputusan = item.keputusan_bimbingan?.[0]
               return (
                 <div key={item.id} className="bg-white rounded-xl border border-[#DAEAF7] p-5">
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start justify-between mb-2">
                     <div>
                       <p className="font-medium text-[#0C4A6E] text-sm">{item.topik}</p>
                       <p className="text-xs text-[#94A3B8] mt-0.5">
-                        {jenisBimbinganOptions.find(j => j.value === item.jenis_bimbingan)?.label} —{' '}
-                        {dosenOptions.find(d => d.value === item.ditujukan_ke)?.label} —{' '}
-                        {item.tanggal_bimbingan}
+                        {jenisBimbinganOptions.find(j => j.value === item.jenis_bimbingan)?.label}{' '}
+                        — {dosenOptions.find(d => d.value === item.ditujukan_ke)?.label}{' '}
+                        — {item.tanggal_bimbingan}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -411,7 +424,7 @@ export default function PengajuanBimbingan() {
                   )}
 
                   <div className="flex gap-3 mb-3">
-                    
+                    <a
                       href={item.link_skripsi}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -420,7 +433,7 @@ export default function PengajuanBimbingan() {
                       📄 Link Skripsi
                     </a>
                     {item.link_lampiran && (
-                      
+                      <a
                         href={item.link_lampiran}
                         target="_blank"
                         rel="noopener noreferrer"

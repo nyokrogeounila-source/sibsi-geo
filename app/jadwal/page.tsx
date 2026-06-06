@@ -1,6 +1,28 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 
+function DosenAvatar({ nama, foto, label }: { nama: string | null, foto: string | null, label: string }) {
+  if (!nama) return null
+  return (
+    <div className="flex items-center gap-2">
+      {foto ? (
+        <img src={foto} alt={nama}
+          className="w-8 h-8 rounded-full object-cover border border-[#DAEAF7]" />
+      ) : (
+        <div className="w-8 h-8 rounded-full bg-[#E0F2FE] flex items-center justify-center flex-shrink-0">
+          <span className="text-[#0891B2] font-semibold text-xs">
+            {nama.charAt(0).toUpperCase()}
+          </span>
+        </div>
+      )}
+      <div>
+        <p className="text-xs text-[#94A3B8]">{label}</p>
+        <p className="text-xs font-medium text-[#334155]">{nama}</p>
+      </div>
+    </div>
+  )
+}
+
 export default async function JadwalPublik() {
   const supabase = await createClient()
 
@@ -13,21 +35,52 @@ export default async function JadwalPublik() {
 
   const { data: jadwalList } = await supabase
     .from('jadwal_seminar')
-    .select(`
-      *,
-      mahasiswa:mahasiswa_id(
-        npm, angkatan,
-        profiles!mahasiswa_id_fkey(nama, foto_url)
-      ),
-      ruangan(*),
-      pb1:pb1_id(id, profiles!dosen_id_fkey(nama, foto_url)),
-      pb2:pb2_id(id, profiles!dosen_id_fkey(nama, foto_url)),
-      penguji:penguji_id(id, profiles!dosen_id_fkey(nama, foto_url))
-    `)
+    .select('*')
     .eq('status', 'disetujui')
     .gte('tanggal_disetujui', todayStr)
     .lte('tanggal_disetujui', in14DaysStr)
     .order('tanggal_disetujui', { ascending: true })
+
+  let jadwalWithData: any[] = []
+
+  if (jadwalList && jadwalList.length > 0) {
+    const mahasiswaIds = jadwalList.map(j => j.mahasiswa_id)
+    const dosenIds = [
+      ...jadwalList.filter(j => j.pb1_id).map(j => j.pb1_id),
+      ...jadwalList.filter(j => j.pb2_id).map(j => j.pb2_id),
+      ...jadwalList.filter(j => j.penguji_id).map(j => j.penguji_id),
+    ].filter(Boolean)
+    const ruanganIds = jadwalList.filter(j => j.ruangan_id).map(j => j.ruangan_id)
+
+    const { data: profilesMhs } = await supabase
+      .from('profiles').select('id, nama, foto_url').in('id', mahasiswaIds)
+
+    const { data: profilesDosen } = dosenIds.length > 0
+      ? await supabase.from('profiles').select('id, nama, foto_url').in('id', dosenIds)
+      : { data: [] }
+
+    const { data: ruanganData } = ruanganIds.length > 0
+      ? await supabase.from('ruangan').select('id, nama_ruangan').in('id', ruanganIds)
+      : { data: [] }
+
+    const { data: mahasiswaData } = await supabase
+      .from('mahasiswa').select('id, npm, angkatan').in('id', mahasiswaIds)
+
+    jadwalWithData = jadwalList.map(j => ({
+      ...j,
+      mahasiswaNama: profilesMhs?.find(p => p.id === j.mahasiswa_id)?.nama ?? '—',
+      mahasiswaFoto: profilesMhs?.find(p => p.id === j.mahasiswa_id)?.foto_url ?? null,
+      mahasiswaNpm: mahasiswaData?.find(m => m.id === j.mahasiswa_id)?.npm ?? '—',
+      mahasiswaAngkatan: mahasiswaData?.find(m => m.id === j.mahasiswa_id)?.angkatan ?? '—',
+      pb1Nama: profilesDosen?.find(p => p.id === j.pb1_id)?.nama ?? null,
+      pb1Foto: profilesDosen?.find(p => p.id === j.pb1_id)?.foto_url ?? null,
+      pb2Nama: profilesDosen?.find(p => p.id === j.pb2_id)?.nama ?? null,
+      pb2Foto: profilesDosen?.find(p => p.id === j.pb2_id)?.foto_url ?? null,
+      pengujiNama: profilesDosen?.find(p => p.id === j.penguji_id)?.nama ?? null,
+      pengujiNamFoto: profilesDosen?.find(p => p.id === j.penguji_id)?.foto_url ?? null,
+      ruanganNama: ruanganData?.find(r => r.id === j.ruangan_id)?.nama_ruangan ?? null,
+    }))
+  }
 
   const jenisSeminarLabel: Record<string, string> = {
     proposal: 'Seminar Proposal',
@@ -41,16 +94,15 @@ export default async function JadwalPublik() {
     komprehensif: 'bg-green-100 text-green-700',
   }
 
-  // Group by tanggal
   const grouped: Record<string, any[]> = {}
-  jadwalList?.forEach((item) => {
+  jadwalWithData.forEach((item) => {
     const tgl = item.tanggal_disetujui
     if (!grouped[tgl]) grouped[tgl] = []
     grouped[tgl].push(item)
   })
 
   const formatTanggal = (dateStr: string) => {
-    const date = new Date(dateStr)
+    const date = new Date(dateStr + 'T00:00:00')
     return date.toLocaleDateString('id-ID', {
       weekday: 'long',
       day: 'numeric',
@@ -59,35 +111,8 @@ export default async function JadwalPublik() {
     })
   }
 
-  const DosenAvatar = ({ dosen, label }: { dosen: any; label: string }) => {
-    if (!dosen) return null
-    const nama = dosen.profiles?.nama ?? '—'
-    return (
-      <div className="flex items-center gap-2">
-        {dosen.profiles?.foto_url ? (
-          <img
-            src={dosen.profiles.foto_url}
-            alt={nama}
-            className="w-7 h-7 rounded-full object-cover border border-[#DAEAF7]"
-          />
-        ) : (
-          <div className="w-7 h-7 rounded-full bg-[#E0F2FE] flex items-center justify-center flex-shrink-0">
-            <span className="text-[#0891B2] font-semibold text-xs">
-              {nama.charAt(0).toUpperCase()}
-            </span>
-          </div>
-        )}
-        <div>
-          <p className="text-xs text-[#94A3B8]">{label}</p>
-          <p className="text-xs font-medium text-[#334155]">{nama}</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <main className="min-h-screen bg-[#F0F7FF]">
-      {/* Header */}
       <header className="bg-white border-b border-[#DAEAF7]">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -99,10 +124,7 @@ export default async function JadwalPublik() {
               <p className="text-xs text-[#64748B]">Jadwal Seminar</p>
             </div>
           </div>
-          <Link
-            href="/"
-            className="text-xs text-[#64748B] hover:text-[#0891B2] transition"
-          >
+          <Link href="/" className="text-xs text-[#64748B] hover:text-[#0891B2] transition">
             ← Beranda
           </Link>
         </div>
@@ -116,13 +138,9 @@ export default async function JadwalPublik() {
           </p>
         </div>
 
-        {/* Legenda */}
         <div className="flex gap-3 mb-8 flex-wrap">
           {Object.entries(jenisSeminarLabel).map(([key, label]) => (
-            <span
-              key={key}
-              className={`text-xs px-3 py-1 rounded-full font-medium ${jenisSeminarColor[key]}`}
-            >
+            <span key={key} className={`text-xs px-3 py-1 rounded-full font-medium ${jenisSeminarColor[key]}`}>
               {label}
             </span>
           ))}
@@ -131,9 +149,7 @@ export default async function JadwalPublik() {
         {Object.keys(grouped).length === 0 ? (
           <div className="bg-white rounded-2xl border border-[#DAEAF7] p-16 text-center">
             <p className="text-4xl mb-4">📅</p>
-            <p className="text-sm font-medium text-[#334155] mb-1">
-              Tidak ada jadwal seminar
-            </p>
+            <p className="text-sm font-medium text-[#334155] mb-1">Tidak ada jadwal seminar</p>
             <p className="text-xs text-[#94A3B8]">
               Dalam 14 hari ke depan belum ada jadwal seminar yang dijadwalkan
             </p>
@@ -144,56 +160,46 @@ export default async function JadwalPublik() {
               .sort(([a], [b]) => a.localeCompare(b))
               .map(([tanggal, items]) => (
                 <div key={tanggal}>
-                  {/* Tanggal Header */}
                   <div className="flex items-center gap-3 mb-4">
                     <div className="bg-[#0891B2] text-white rounded-xl px-4 py-2 text-center min-w-16">
                       <p className="text-lg font-bold leading-none">
-                        {new Date(tanggal).getDate()}
+                        {new Date(tanggal + 'T00:00:00').getDate()}
                       </p>
                       <p className="text-xs opacity-80">
-                        {new Date(tanggal).toLocaleDateString('id-ID', { month: 'short' })}
+                        {new Date(tanggal + 'T00:00:00').toLocaleDateString('id-ID', { month: 'short' })}
                       </p>
                     </div>
                     <div>
-                      <p className="font-semibold text-[#0C4A6E] text-sm">
-                        {formatTanggal(tanggal)}
-                      </p>
-                      <p className="text-xs text-[#94A3B8]">
-                        {items.length} seminar
-                      </p>
+                      <p className="font-semibold text-[#0C4A6E] text-sm">{formatTanggal(tanggal)}</p>
+                      <p className="text-xs text-[#94A3B8]">{items.length} seminar</p>
                     </div>
                   </div>
 
-                  {/* Kartu Seminar */}
                   <div className="space-y-4 ml-2">
                     {items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="bg-white rounded-2xl border border-[#DAEAF7] p-6"
-                      >
-                        {/* Header Kartu */}
+                      <div key={item.id} className="bg-white rounded-2xl border border-[#DAEAF7] p-6">
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center gap-3">
-                            {item.mahasiswa?.profiles?.foto_url ? (
-                              <img
-                                src={item.mahasiswa.profiles.foto_url}
-                                alt={item.mahasiswa.profiles.nama}
-                                className="w-12 h-12 rounded-full object-cover border-2 border-[#DAEAF7]"
-                              />
+                            {item.mahasiswaFoto ? (
+                              <img src={item.mahasiswaFoto} alt={item.mahasiswaNama}
+                                className="w-12 h-12 rounded-full object-cover border-2 border-[#DAEAF7]" />
                             ) : (
                               <div className="w-12 h-12 rounded-full bg-[#E0F2FE] flex items-center justify-center flex-shrink-0">
                                 <span className="text-[#0891B2] font-bold text-lg">
-                                  {item.mahasiswa?.profiles?.nama?.charAt(0).toUpperCase()}
+                                  {item.mahasiswaNama?.charAt(0).toUpperCase()}
                                 </span>
                               </div>
                             )}
                             <div>
-                              <p className="font-semibold text-[#0C4A6E]">
-                                {item.mahasiswa?.profiles?.nama}
-                              </p>
+                              <p className="font-semibold text-[#0C4A6E]">{item.mahasiswaNama}</p>
                               <p className="text-xs text-[#94A3B8]">
-                                NPM: {item.mahasiswa?.npm} · Angkatan {item.mahasiswa?.angkatan}
+                                NPM: {item.mahasiswaNpm} · Angkatan {item.mahasiswaAngkatan}
                               </p>
+                              {item.jam && (
+                                <p className="text-xs font-medium text-[#0891B2] mt-0.5">
+                                  🕐 {item.jam}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <span className={`text-xs px-3 py-1 rounded-full font-medium ${jenisSeminarColor[item.jenis_seminar]}`}>
@@ -201,26 +207,22 @@ export default async function JadwalPublik() {
                           </span>
                         </div>
 
-                        {/* Ruangan */}
-                        {item.ruangan && (
+                        {item.ruanganNama && (
                           <div className="flex items-center gap-2 mb-4">
                             <span className="text-sm">📍</span>
-                            <span className="text-sm font-medium text-[#334155]">
-                              {item.ruangan.nama_ruangan}
-                            </span>
+                            <span className="text-sm font-medium text-[#334155]">{item.ruanganNama}</span>
                           </div>
                         )}
 
-                        {/* Dosen */}
                         <div className="border-t border-[#F1F5F9] pt-4">
                           <p className="text-xs text-[#94A3B8] mb-3">Dosen</p>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <DosenAvatar dosen={item.pb1} label="Pembimbing 1" />
-                            {item.pb2 && (
-                              <DosenAvatar dosen={item.pb2} label="Pembimbing 2" />
+                            <DosenAvatar nama={item.pb1Nama} foto={item.pb1Foto} label="Pembimbing 1" />
+                            {item.pb2Nama && (
+                              <DosenAvatar nama={item.pb2Nama} foto={item.pb2Foto} label="Pembimbing 2" />
                             )}
-                            {item.penguji && (
-                              <DosenAvatar dosen={item.penguji} label="Penguji" />
+                            {item.pengujiNama && (
+                              <DosenAvatar nama={item.pengujiNama} foto={item.pengujiNamFoto} label="Penguji" />
                             )}
                           </div>
                         </div>

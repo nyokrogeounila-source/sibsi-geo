@@ -23,6 +23,7 @@ const menuDosen = [
   { href: '/dashboard/dosen', label: 'Beranda', icon: '🏠' },
   { href: '/dashboard/dosen/profil', label: 'Profil', icon: '👤' },
   { href: '/dashboard/dosen/bimbingan', label: 'Daftar Bimbingan', icon: '📚' },
+  { href: '/dashboard/dosen/jadwal', label: 'Jadwal Seminar', icon: '📅' },
 ]
 
 const menuAdmin = [
@@ -31,6 +32,7 @@ const menuAdmin = [
   { href: '/dashboard/admin/pengajuan-judul', label: 'Pengajuan Judul', icon: '📝' },
   { href: '/dashboard/admin/jadwal', label: 'Pengaturan Jadwal', icon: '📅' },
   { href: '/dashboard/admin/pengguna', label: 'Pengguna', icon: '👥' },
+  { href: '/dashboard/admin/progres', label: 'Progres Bimbingan', icon: '📈' },
 ]
 
 const menuByRole = {

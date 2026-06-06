@@ -1,25 +1,22 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 
-const inter = Inter({ subsets: ["latin"] });
-
-export const metadata: Metadata = {
-  title: "SIBSI GEO — Pendidikan Geografi FKIP Unila",
-  description: "Sistem Informasi Bimbingan Skripsi Program Studi Pendidikan Geografi FKIP Universitas Lampung",
-  icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌏</text></svg>",
-  },
-};
-
-export default function RootLayout({
+export default async function DashboardLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
   return (
-    <html lang="id">
-      <body className={inter.className}>{children}</body>
-    </html>
-  );
+    <div className="min-h-screen bg-[#F0F7FF]">
+      {children}
+    </div>
+  )
 }

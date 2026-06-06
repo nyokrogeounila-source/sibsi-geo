@@ -28,25 +28,19 @@ export default async function DashboardMahasiswa() {
 
   if (mahasiswa?.pb1_id) {
     const { data: pb1 } = await supabase
-      .from('profiles')
-      .select('nama')
-      .eq('id', mahasiswa.pb1_id)
-      .single()
+      .from('profiles').select('nama').eq('id', mahasiswa.pb1_id).single()
     pb1Nama = pb1?.nama ?? '—'
   }
 
   if (mahasiswa?.pb2_id) {
     const { data: pb2 } = await supabase
-      .from('profiles')
-      .select('nama')
-      .eq('id', mahasiswa.pb2_id)
-      .single()
+      .from('profiles').select('nama').eq('id', mahasiswa.pb2_id).single()
     pb2Nama = pb2?.nama ?? '—'
   }
 
   const { data: bimbingan } = await supabase
     .from('bimbingan')
-    .select('*')
+    .select('*, keputusan_bimbingan(*)')
     .eq('mahasiswa_id', user.id)
     .order('created_at', { ascending: false })
     .limit(5)
@@ -63,6 +57,12 @@ export default async function DashboardMahasiswa() {
     hasil_penelitian: 'Bimbingan Hasil Penelitian',
     pasca_seminar_hasil: 'Bimbingan Pasca Seminar Hasil',
     cetak: 'Bimbingan Cetak',
+  }
+
+  const keputusanColor: Record<string, string> = {
+    revisi_mayor: 'bg-red-100 text-red-700',
+    revisi_minor: 'bg-orange-100 text-orange-700',
+    accepted: 'bg-green-100 text-green-700',
   }
 
   return (
@@ -115,26 +115,34 @@ export default async function DashboardMahasiswa() {
           <h2 className="font-semibold text-[#0C4A6E] mb-4">Bimbingan Terakhir</h2>
           {bimbingan && bimbingan.length > 0 ? (
             <div className="space-y-3">
-              {bimbingan.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between py-3 border-b border-[#F1F5F9] last:border-0"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-[#334155]">{item.topik}</p>
-                    <p className="text-xs text-[#94A3B8] mt-0.5">
-                      {jenisBimbinganLabel[item.jenis_bimbingan]} — {item.tanggal_bimbingan}
-                    </p>
+              {bimbingan.map((item: any) => {
+                const keputusan = item.keputusan_bimbingan?.[0]
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between py-3 border-b border-[#F1F5F9] last:border-0"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-[#334155]">{item.topik}</p>
+                      <p className="text-xs text-[#94A3B8] mt-0.5">
+                        {jenisBimbinganLabel[item.jenis_bimbingan]} — {item.tanggal_bimbingan}
+                      </p>
+                      {keputusan?.komentar && (
+                        <p className="text-xs text-[#64748B] mt-1">💬 {keputusan.komentar}</p>
+                      )}
+                    </div>
+                    {keputusan ? (
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${keputusanColor[keputusan.keputusan]}`}>
+                        {keputusan.keputusan.replace(/_/g, ' ').toUpperCase()}
+                      </span>
+                    ) : (
+                      <span className="text-xs px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700">
+                        Menunggu Review
+                      </span>
+                    )}
                   </div>
-                  <span className={`text-xs px-2.5 py-1 rounded-full ${
-                    item.status === 'selesai' ? 'bg-green-100 text-green-700' :
-                    item.status === 'diproses' ? 'bg-blue-100 text-blue-700' :
-                    'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {item.status}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <div className="text-center py-8">
